@@ -72,6 +72,7 @@ type IpsetCreateOptions struct {
 	IPTo     net.IP
 	PortFrom uint16
 	PortTo   uint16
+	Family   uint8
 }
 
 // IpsetProtocol returns the ipset protocol version from the kernel
@@ -153,7 +154,9 @@ func (h *Handle) IpsetCreate(setname, typename string, options IpsetCreateOption
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_PORT_FROM|int(nl.NLA_F_NET_BYTEORDER), buf[:2]))
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_PORT_TO|int(nl.NLA_F_NET_BYTEORDER), buf[2:]))
 	default:
-		family = unix.AF_INET
+		if family = options.Family; family == 0 {
+			family = unix.AF_INET
+		}
 	}
 
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_FAMILY, nl.Uint8Attr(family)))
