@@ -49,7 +49,7 @@ func NewNetem(attrs QdiscAttrs, nattrs NetemQdiscAttrs) *Netem {
 	reorderCorr = Percentage2u32(nattrs.ReorderCorr)
 
 	if reorderProb > 0 {
-		// ERROR if lantency == 0
+		// ERROR if latency == 0
 		if gap == 0 {
 			gap = 1
 		}
