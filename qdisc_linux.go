@@ -209,13 +209,25 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		options = nl.NewRtAttr(nl.TCA_OPTIONS, opt.Serialize())
 	case *Netem:
 		opt := nl.TcNetemQopt{}
-		opt.Latency = qdisc.Latency
 		opt.Limit = qdisc.Limit
 		opt.Loss = qdisc.Loss
 		opt.Gap = qdisc.Gap
 		opt.Duplicate = qdisc.Duplicate
-		opt.Jitter = qdisc.Jitter
 		options = nl.NewRtAttr(nl.TCA_OPTIONS, opt.Serialize())
+		// Latency
+		if qdisc.Latency >= 1<<32 {
+			options.AddRtAttr(nl.TCA_NETEM_LATENCY64, nl.Uint64Attr(qdisc.Latency))
+			opt.Latency = 0
+		} else {
+			opt.Latency = uint32(qdisc.Latency)
+		}
+		// Jitter
+		if qdisc.Jitter >= 1<<32 {
+			options.AddRtAttr(nl.TCA_NETEM_JITTER64, nl.Uint64Attr(qdisc.Jitter))
+			opt.Latency = 0
+		} else {
+			opt.Jitter = uint32(qdisc.Jitter)
+		}
 		// Correlation
 		corr := nl.TcNetemCorr{}
 		corr.DelayCorr = qdisc.DelayCorr
@@ -576,12 +588,12 @@ func parseFqData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 func parseNetemData(qdisc Qdisc, value []byte) error {
 	netem := qdisc.(*Netem)
 	opt := nl.DeserializeTcNetemQopt(value)
-	netem.Latency = opt.Latency
+	netem.Latency = uint64(opt.Latency)
 	netem.Limit = opt.Limit
 	netem.Loss = opt.Loss
 	netem.Gap = opt.Gap
 	netem.Duplicate = opt.Duplicate
-	netem.Jitter = opt.Jitter
+	netem.Jitter = uint64(opt.Jitter)
 	data, err := nl.ParseRouteAttr(value[nl.SizeofTcNetemQopt:])
 	if err != nil {
 		return err
@@ -609,6 +621,10 @@ func parseNetemData(qdisc Qdisc, value []byte) error {
 			netem.CellOverhead = opt.CellOverhead
 		case nl.TCA_NETEM_RATE64:
 			netem.Rate = native.Uint64(datum.Value)
+		case nl.TCA_NETEM_LATENCY64:
+			netem.Latency = native.Uint64(datum.Value)
+		case nl.TCA_NETEM_JITTER64:
+			netem.Jitter = native.Uint64(datum.Value)
 		}
 	}
 	return nil
@@ -708,12 +724,12 @@ func Hz() float64 {
 	return hz
 }
 
-func time2Tick(time uint32) uint32 {
-	return uint32(float64(time) * TickInUsec())
+func time2Tick(time uint64) uint64 {
+	return uint64(float64(time) * TickInUsec())
 }
 
-func tick2Time(tick uint32) uint32 {
-	return uint32(float64(tick) / TickInUsec())
+func tick2Time(tick uint64) uint64 {
+	return uint64(float64(tick) / TickInUsec())
 }
 
 func time2Ktime(time uint32) uint32 {
@@ -724,15 +740,15 @@ func ktime2Time(ktime uint32) uint32 {
 	return uint32(float64(ktime) / ClockFactor())
 }
 
-func burst(rate uint64, buffer uint32) uint32 {
+func burst(rate uint64, buffer uint64) uint32 {
 	return uint32(float64(rate) * float64(tick2Time(buffer)) / TIME_UNITS_PER_SEC)
 }
 
-func latency(rate uint64, limit, buffer uint32) float64 {
+func latency(rate uint64, limit, buffer uint64) float64 {
 	return TIME_UNITS_PER_SEC*(float64(limit)/float64(rate)) - float64(tick2Time(buffer))
 }
 
 func Xmittime(rate uint64, size uint32) uint32 {
 	// https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/tree/tc/tc_core.c#n62
-	return time2Tick(uint32(TIME_UNITS_PER_SEC * (float64(size) / float64(rate))))
+	return uint32(time2Tick(uint64(TIME_UNITS_PER_SEC * (float64(size) / float64(rate)))))
 }

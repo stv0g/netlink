@@ -137,7 +137,7 @@ func (qdisc *Htb) Type() string {
 // Netem is a classless qdisc that rate limits based on tokens
 
 type NetemQdiscAttrs struct {
-	Latency        uint32  // in us
+	Latency        uint64  // in us
 	DelayCorr      float32 // in %
 	Limit          uint32
 	Loss           float32 // in %
@@ -145,7 +145,7 @@ type NetemQdiscAttrs struct {
 	Gap            uint32
 	Duplicate      float32 // in %
 	DuplicateCorr  float32 // in %
-	Jitter         uint32  // in us
+	Jitter         uint64  // in us
 	ReorderProb    float32 // in %
 	ReorderCorr    float32 // in %
 	CorruptProb    float32 // in %
@@ -165,7 +165,7 @@ func (q NetemQdiscAttrs) String() string {
 
 type Netem struct {
 	QdiscAttrs
-	Latency        uint32
+	Latency        uint64
 	DelayCorr      uint32
 	Limit          uint32
 	Loss           uint32
@@ -173,7 +173,7 @@ type Netem struct {
 	Gap            uint32
 	Duplicate      uint32
 	DuplicateCorr  uint32
-	Jitter         uint32
+	Jitter         uint64
 	ReorderProb    uint32
 	ReorderCorr    uint32
 	CorruptProb    uint32
