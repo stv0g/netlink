@@ -23,6 +23,10 @@ func NewNetem(attrs QdiscAttrs, nattrs NetemQdiscAttrs) *Netem {
 	gap := nattrs.Gap
 	duplicate := Percentage2u32(nattrs.Duplicate)
 	jitter := nattrs.Jitter
+	rate := nattrs.Rate
+	packetOverhead := nattrs.PacketOverhead
+	cellSize := nattrs.CellSize
+	cellOverhead := nattrs.CellOverhead
 
 	// Correlation
 	if latency > 0 && jitter > 0 {
@@ -59,20 +63,24 @@ func NewNetem(attrs QdiscAttrs, nattrs NetemQdiscAttrs) *Netem {
 	corruptCorr = Percentage2u32(nattrs.CorruptCorr)
 
 	return &Netem{
-		QdiscAttrs:    attrs,
-		Latency:       latency,
-		DelayCorr:     delayCorr,
-		Limit:         limit,
-		Loss:          loss,
-		LossCorr:      lossCorr,
-		Gap:           gap,
-		Duplicate:     duplicate,
-		DuplicateCorr: duplicateCorr,
-		Jitter:        jitter,
-		ReorderProb:   reorderProb,
-		ReorderCorr:   reorderCorr,
-		CorruptProb:   corruptProb,
-		CorruptCorr:   corruptCorr,
+		QdiscAttrs:     attrs,
+		Latency:        latency,
+		DelayCorr:      delayCorr,
+		Limit:          limit,
+		Loss:           loss,
+		LossCorr:       lossCorr,
+		Gap:            gap,
+		Duplicate:      duplicate,
+		DuplicateCorr:  duplicateCorr,
+		Jitter:         jitter,
+		ReorderProb:    reorderProb,
+		ReorderCorr:    reorderCorr,
+		CorruptProb:    corruptProb,
+		CorruptCorr:    corruptCorr,
+		Rate:           rate,
+		PacketOverhead: packetOverhead,
+		CellSize:       cellSize,
+		CellOverhead:   cellOverhead,
 	}
 }
 
@@ -230,6 +238,20 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		reorder.Correlation = qdisc.ReorderCorr
 		if reorder.Probability > 0 {
 			options.AddRtAttr(nl.TCA_NETEM_REORDER, reorder.Serialize())
+		}
+		// Rate
+		rate := nl.TcNetemRate{}
+		if qdisc.Rate >= 1<<32 {
+			options.AddRtAttr(nl.TCA_NETEM_RATE64, nl.Uint64Attr(qdisc.Rate))
+			rate.Rate = 0
+		} else {
+			rate.Rate = uint32(qdisc.Rate)
+		}
+		rate.PacketOverhead = qdisc.PacketOverhead
+		rate.CellSize = qdisc.CellSize
+		rate.CellOverhead = qdisc.CellOverhead
+		if rate.Rate > 0 || rate.CellSize > 0 || rate.PacketOverhead != 0 || rate.CellOverhead != 0 {
+			options.AddRtAttr(nl.TCA_NETEM_RATE, rate.Serialize())
 		}
 	case *Ingress:
 		// ingress filters must use the proper handle
@@ -579,6 +601,14 @@ func parseNetemData(qdisc Qdisc, value []byte) error {
 			opt := nl.DeserializeTcNetemReorder(datum.Value)
 			netem.ReorderProb = opt.Probability
 			netem.ReorderCorr = opt.Correlation
+		case nl.TCA_NETEM_RATE:
+			opt := nl.DeserializeTcNetemRate(datum.Value)
+			netem.Rate = uint64(opt.Rate)
+			netem.PacketOverhead = opt.PacketOverhead
+			netem.CellSize = opt.CellSize
+			netem.CellOverhead = opt.CellOverhead
+		case nl.TCA_NETEM_RATE64:
+			netem.Rate = native.Uint64(datum.Value)
 		}
 	}
 	return nil
